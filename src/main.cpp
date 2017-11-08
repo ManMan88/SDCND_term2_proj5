@@ -9,6 +9,12 @@
 #include "MPC.h"
 #include "json.hpp"
 
+// define the simulated latency
+#define LATENCY_TIME 100
+
+// define path polynomial order
+#define POLYNOM_ORDER 3
+
 // for convenience
 using json = nlohmann::json;
 
@@ -91,6 +97,8 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double current_steering = j[1]["steering_angle"];
+          double current_throttle = j[1]["throttle"];
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,6 +106,7 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
+
           double steer_value;
           double throttle_value;
 
@@ -139,7 +148,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(LATENCY_TIME));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
