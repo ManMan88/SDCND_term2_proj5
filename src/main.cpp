@@ -107,6 +107,36 @@ int main() {
           *
           */
 
+          /*
+           * transforming the way-points to the vehicle frame
+           */
+          // theta is the angle formed by vehicle position relative to the world frame
+          double theta = atan2(py,px);
+
+          // R is the distance of the vehicle from the world frame
+          double R = sqrt(x*x + y*y);
+
+          // make the transformation
+          ptsx_tf = ptsx*cos(psi) + ptsy*sin(psi) + R*cos(pi()-psi+theta);
+          ptsy_tf = -ptsx*sin(psi) + ptsy*cos(psi) + R*sin(pi()-psi+theta);
+
+          // fit a polynomial to the way-points in the vehicle frame
+          Eigen::VectorXd path_coefficients = polyfit(ptsx_tf, ptsy_tf, POLYNOM_ORDER);
+
+          /*
+           * assemble the state vector - x_t, y_t, psi, v, cte, e_psi
+           */
+          // the cte is f(x_t) - y_t. here x_t = y_t = 0 because the path is in the vehicle frame
+          double cte = polyeval(path_coefficients,0);
+
+          // the e_psi is psi_des - psi_t, where psi_des is the tangential angle of the polynomial evaluated at x_t
+          // but x_t = 0 and psi_t = 0 (in frame of vehicle) so e_psi = psi_des = the coefficient of order 1
+          double e_psi = path_coefficients[1];
+
+          // set the state vector
+          Eigen::VectorXd current_state(6);
+          current_state << 0, 0, 0, v, cte, e_psi;
+
           double steer_value;
           double throttle_value;
 
