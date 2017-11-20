@@ -114,14 +114,29 @@ int main() {
           double theta = atan2(py,px);
 
           // R is the distance of the vehicle from the world frame
-          double R = sqrt(x*x + y*y);
+          double R = sqrt(px*px + py*py);
 
-          // make the transformation
-          ptsx_tf = ptsx*cos(psi) + ptsy*sin(psi) + R*cos(pi()-psi+theta);
-          ptsy_tf = -ptsx*sin(psi) + ptsy*cos(psi) + R*sin(pi()-psi+theta);
+          // set the rotation matrix
+          Eigen::MatrixXd transformation_matrix(2,2);
+          transformation_matrix << cos(psi), sin(psi),//, R*cos(pi()-psi+theta);
+                                  -sin(psi), cos(psi);//, R*sin(pi()-psi+theta);
+
+          // set the translation vector
+          Eigen::VectorXd translation_vector(2);
+          translation_vector << R*cos(pi()-psi+theta), R*sin(pi()-psi+theta);
+
+          // typecasting vector to VectorXd
+          Eigen::Map<Eigen::RowVectorXd> ptsx_tf(ptsx.data(), ptsx.size());
+          Eigen::Map<Eigen::RowVectorXd> ptsy_tf(ptsy.data(), ptsy.size());
+          Eigen::MatrixXd pts_tf;
+          pts_tf << ptsx_tf,
+                    ptsy_tf;
+
+          // transforming the vectors from the world frame to the vehicle frame
+          pts_tf = transformation_matrix*pts_tf + translation_vector;
 
           // fit a polynomial to the way-points in the vehicle frame
-          Eigen::VectorXd path_coefficients = polyfit(ptsx_tf, ptsy_tf, POLYNOM_ORDER);
+          Eigen::VectorXd path_coefficients = polyfit(pts_tf.row(0), pts_tf.row(1), POLYNOM_ORDER);
 
           /*
            * assemble the state vector - x_t, y_t, psi, v, cte, e_psi
