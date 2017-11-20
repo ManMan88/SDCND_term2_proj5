@@ -6,8 +6,10 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 0;
-double dt = 0;
+#define PREDICTION_HORIZON 5 //seconds
+
+size_t N = 5000;
+double dt = PREDICTION_HORIZON/(double)N; //seconds
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -33,6 +35,7 @@ class FG_eval {
     // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
+
   }
 };
 
@@ -47,31 +50,61 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
+  // retrieve the number of state variables
+  size_t n_state = state.size();
+
+  // define the number of actuators
+  size_t n_actuator = 2;
+
   // TODO: Set the number of model variables (includes both states and inputs).
   // For example: If the state is a 4 element vector, the actuators is a 2
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  size_t n_vars = 0;
+  size_t n_vars = n_state*N + n_actuator*(N-1);
   // TODO: Set the number of constraints
-  size_t n_constraints = 0;
+  size_t n_constraints = n_state;
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
   Dvector vars(n_vars);
-  for (int i = 0; i < n_vars; i++) {
+  for (i = 0; i < n_vars; i++) {
     vars[i] = 0;
   }
 
+  // set the starting indices
+  // the order is: x, y, psi, v, cte, e_psi, steering, acceleration
+  vector<double> start_index;
+  for (i = 0; i < n_state; i++) {
+    start_index.push_back(i*N);
+  }
+  for (i = 0; i < n_actuator; i++) {
+    start_index.push_back(n_state*N + i*(N-1));
+  }
+
+  // set the initial state to vars
+  for (i = 0; i < n_state; i++) {
+    vars[start_index[i]] = state[i];
+  }
+
+  // TODO: Set lower and upper limits for variables.
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
-  // TODO: Set lower and upper limits for variables.
+
+  for (i = start_index[n_state]; i < start_index[n_state+1]; i++) {
+    vars_lowerbound[i] = -0.436332;
+    vars_upperbound[i] = 0.436332;
+  }
+  for (i = start_index[n_state+1]; i < n_vars; i++) {
+    vars_lowerbound[i] = -1.0;
+    vars_upperbound[i] = 1.0;
+  }
 
   // Lower and upper limits for the constraints
   // Should be 0 besides initial state.
   Dvector constraints_lowerbound(n_constraints);
   Dvector constraints_upperbound(n_constraints);
-  for (int i = 0; i < n_constraints; i++) {
+  for (i = 0; i < n_constraints; i++) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
   }
@@ -117,5 +150,10 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {};
+  vector<double> actuator_vals;
+  for (i = 0; i < n_actuator; i++) {
+    int index = start_index[n_state+i];
+    actuator_vals.push_back(solution.x[index]);
+  }
+  return actuator_vals;
 }
