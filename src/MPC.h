@@ -7,6 +7,10 @@
 using namespace std;
 
 class MPC {
+
+  // the indices of the first vars
+  vector<double> start_index;
+
  public:
   MPC();
 

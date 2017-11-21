@@ -5,11 +5,20 @@
 
 using CppAD::AD;
 
+// define desired velocity
+#define velocity_des 40
+
 // TODO: Set the timestep length and duration
 #define PREDICTION_HORIZON 5 //seconds
 
 size_t N = 5000;
 double dt = PREDICTION_HORIZON/(double)N; //seconds
+
+// retrieve the number of state variables
+#define n_state 6
+
+// define the number of actuators
+#define n_actuator 2
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -24,10 +33,24 @@ double dt = PREDICTION_HORIZON/(double)N; //seconds
 const double Lf = 2.67;
 
 class FG_eval {
+  // the indices of the first vars
+  vector<double> start_index;
+
  public:
   // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
-  FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+  FG_eval(Eigen::VectorXd coeffs) {
+    this->coeffs = coeffs;
+
+    // set the starting indices
+    // the order is: x, y, psi, v, cte, e_psi, steering, acceleration
+    for (int i = 0; i < n_state; i++) {
+      start_index.push_back(i*N);
+    }
+    for (int i = 0; i < n_actuator; i++) {
+      start_index.push_back(n_state*N + i*(N-1));
+    }
+  }
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
@@ -36,25 +59,95 @@ class FG_eval {
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
 
+    // set the initial state
+    for (size_t i = 0; i < n_state; i++) {
+      fg[1 + start_index[i]] = vars[start_index[i]];
+    }
+
+    // set the constrains
+    for (size_t t = 1; t < N; t++) {
+      // set the current state
+      AD<double> x0 = vars[start_index[0] + t - 1];
+      AD<double> y0 = vars[start_index[1] + t - 1];
+      AD<double> psi0 = vars[start_index[2] + t - 1];
+      AD<double> v0 = vars[start_index[3] + t - 1];
+      //AD<double> cte0 = vars[start_index[4] + t - 1];
+      AD<double> e_psi0 = vars[start_index[5] + t - 1];
+      AD<double> steer0 = vars[start_index[6] + t - 1];
+      AD<double> accel0 = vars[start_index[7] + t - 1];
+
+      // set the future state
+      AD<double> x1 = vars[start_index[0] + t];
+      AD<double> y1 = vars[start_index[1] + t];
+      AD<double> psi1 = vars[start_index[2] + t];
+      AD<double> v1 = vars[start_index[3] + t];
+      AD<double> cte1 = vars[start_index[4] + t];
+      AD<double> e_psi1 = vars[start_index[5] + t];
+
+      //calculate the current desired y location - f_x0 and the current desired psi - psi_des
+      AD<double> f_x0 = 0;
+      AD<double> psi_des = 0;
+      // calculate f(x0)
+      for (int i = 0; i < coeffs.size(); i++)
+        f_x0 += coeffs[i] * CppAD::pow(x0,i);
+      // calculate f'(x0)
+      for (int i = 1; i < coeffs.size(); i++)
+        psi_des += i * coeffs[i] * CppAD::pow(x0,i-1);
+      // calculate atan(f'(x0))
+      psi_des = CppAD::atan(psi_des);
+
+      // update constraints
+      fg[1 + start_index[0] + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
+      fg[1 + start_index[1] + t] = y1 - (y1 + v0 * CppAD::sin(psi0) * dt);
+      fg[1 + start_index[2] + t] = psi1 - (psi0 + (v0/Lf) * steer0 * dt);
+      fg[1 + start_index[3] + t] = v1 - (v0 + accel0 * dt);
+      fg[1 + start_index[4] + t] = cte1 - ((f_x0-y0) + v0 * CppAD::sin(e_psi0) * dt);
+      fg[1 + start_index[5] + t] = e_psi1 - ((e_psi0-psi_des) + (v0/Lf) * steer0 * dt);
+    }
+
+    // set the cost function
+    fg[0] = 0;
+    // punish for position error, angular error, and velocity error
+    for (size_t t = 0; t < N; t++) {
+      fg[0] += CppAD::pow(vars[start_index[4]+t],2);  //cte^2
+      fg[0] += CppAD::pow(vars[start_index[5]+t],2);  //e_psi^2
+      fg[0] += CppAD::pow(vars[start_index[3]+t] - velocity_des,2);  //velocity_error^2
+    }
+
+    // punish for use of actuators.
+    for (size_t t = 0; t < N-1; t++) {
+      fg[0] += CppAD::pow(vars[start_index[6] + t], 2); //steering
+      fg[0] += CppAD::pow(vars[start_index[7] + t], 2); //acceleration
+    }
+
+    // punish for strong change in actuators
+    for (size_t t = 0; t < N-2; t++) {
+      fg[0] += CppAD::pow(vars[start_index[6]+t+1] - vars[start_index[6]+t],2); //steering diff
+      fg[0] += CppAD::pow(vars[start_index[7]+t+1] - vars[start_index[7]+t],2); //acceleration diff
+    }
+
   }
 };
 
 //
 // MPC class definition implementation.
 //
-MPC::MPC() {}
+MPC::MPC() {
+  // set the starting indices
+  // the order is: x, y, psi, v, cte, e_psi, steering, acceleration
+  for (int i = 0; i < n_state; i++) {
+    start_index.push_back(i*N);
+  }
+  for (int i = 0; i < n_actuator; i++) {
+    start_index.push_back(n_state*N + i*(N-1));
+  }
+}
 MPC::~MPC() {}
 
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
-
-  // retrieve the number of state variables
-  size_t n_state = state.size();
-
-  // define the number of actuators
-  size_t n_actuator = 2;
 
   // TODO: Set the number of model variables (includes both states and inputs).
   // For example: If the state is a 4 element vector, the actuators is a 2
@@ -63,23 +156,13 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // 4 * 10 + 2 * 9
   size_t n_vars = n_state*N + n_actuator*(N-1);
   // TODO: Set the number of constraints
-  size_t n_constraints = n_state;
+  size_t n_constraints = n_state*N;
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
   Dvector vars(n_vars);
   for (i = 0; i < n_vars; i++) {
     vars[i] = 0;
-  }
-
-  // set the starting indices
-  // the order is: x, y, psi, v, cte, e_psi, steering, acceleration
-  vector<double> start_index;
-  for (i = 0; i < n_state; i++) {
-    start_index.push_back(i*N);
-  }
-  for (i = 0; i < n_actuator; i++) {
-    start_index.push_back(n_state*N + i*(N-1));
   }
 
   // set the initial state to vars
