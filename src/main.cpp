@@ -97,8 +97,8 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
-          double current_steering = j[1]["steering_angle"];
-          double current_throttle = j[1]["throttle"];
+          //double current_steering = j[1]["steering_angle"];
+          //double current_throttle = j[1]["throttle"];
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -125,19 +125,12 @@ int main() {
           Eigen::Map<Eigen::RowVectorXd> ptsx_tf(ptsx.data(), ptsx.size());
           Eigen::Map<Eigen::RowVectorXd> ptsy_tf(ptsy.data(), ptsy.size());
           Eigen::MatrixXd pts_tf = Eigen::MatrixXd::Ones(3,ptsx_tf.size());
-          cout << "size of pts_tf: " << pts_tf.rows() << "x" << pts_tf.cols() << endl;
-          cout << "got before pts_tf" << endl;
           pts_tf.topRows(2) << ptsx_tf,ptsy_tf;
-          cout << "size of pts_tf: " << pts_tf.rows() << "x" << pts_tf.cols() << endl;
-          cout << "pts_tf is: " << pts_tf << endl;
 
           // transforming the vectors from the world frame to the vehicle frame
-          cout << "got before transformation" << endl;
-          cout << "transformation_matrix is: " << transformation_matrix << endl;
           pts_tf = transformation_matrix*pts_tf;
 
           // fit a polynomial to the way-points in the vehicle frame
-          cout << "got before polyfit" << endl;
           Eigen::VectorXd path_coefficients = polyfit(pts_tf.row(0), pts_tf.row(1), POLYNOM_ORDER);
 
           /*
@@ -157,11 +150,11 @@ int main() {
           /*
           * Calculate steering angle and throttle using MPC.
           */
-          cout << "got before mcp.Solve" << endl;
           vector<double> actuator_vals = mpc.Solve(current_state,path_coefficients);
-          cout << "finished with mcp.Solve" << endl;
           double steer_value = actuator_vals[0]/deg2rad(25);
           double throttle_value = actuator_vals[1];
+          cout << "steering_angle is: " << steer_value << endl;
+          cout << "throttle_value is: " << throttle_value << endl;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -170,18 +163,18 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          vector<double> mpc_x_vals = mpc.ptsx;
+          vector<double> mpc_y_vals = mpc.ptsy;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
-
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals;//(pts_tf.row(0).data(), pts_tf.row(0).data() + pts_tf.cols());
-          vector<double> next_y_vals;//(pts_tf.row(1).data(), pts_tf.row(1).data() + pts_tf.cols());
+          Eigen::MatrixXd pts_tf_t = pts_tf.transpose();
+          vector<double> next_x_vals(pts_tf_t.col(0).data(), pts_tf_t.col(0).data() + pts_tf_t.rows());
+          vector<double> next_y_vals(pts_tf_t.col(1).data(), pts_tf_t.col(1).data() + pts_tf_t.rows());
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line

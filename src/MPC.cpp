@@ -9,9 +9,9 @@ using CppAD::AD;
 #define velocity_des 40
 
 // TODO: Set the timestep length and duration
-#define PREDICTION_HORIZON 5 //seconds
+#define PREDICTION_HORIZON 1 //seconds
 
-size_t N = 5000;
+size_t N = 10;
 double dt = PREDICTION_HORIZON/(double)N; //seconds
 
 // retrieve the number of state variables
@@ -238,5 +238,18 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     int index = start_index[n_state+i];
     actuator_vals.push_back(solution.x[index]);
   }
+
+  // set the predicted trajectory
+  ptsx.clear();
+  ptsy.clear();
+  for (i = 0; i < N; i++) {
+    int index_x = start_index[0] + i;
+    int index_y = start_index[1] + i;
+    ptsx.push_back(solution.x[index_x]);
+    ptsy.push_back(solution.x[index_y]);
+  }
+
+
+
   return actuator_vals;
 }
