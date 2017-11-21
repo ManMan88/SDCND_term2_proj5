@@ -116,26 +116,28 @@ int main() {
           // R is the distance of the vehicle from the world frame
           double R = sqrt(px*px + py*py);
 
-          // set the rotation matrix
-          Eigen::MatrixXd transformation_matrix(2,2);
-          transformation_matrix << cos(psi), sin(psi),//, R*cos(pi()-psi+theta);
-                                  -sin(psi), cos(psi);//, R*sin(pi()-psi+theta);
-
-          // set the translation vector
-          Eigen::VectorXd translation_vector(2);
-          translation_vector << R*cos(pi()-psi+theta), R*sin(pi()-psi+theta);
+          // set the transformation matrix
+          Eigen::MatrixXd transformation_matrix(2,3);
+          transformation_matrix << cos(psi), sin(psi), R*cos(pi()-psi+theta),
+                                  -sin(psi), cos(psi), R*sin(pi()-psi+theta);
 
           // typecasting vector to VectorXd
           Eigen::Map<Eigen::RowVectorXd> ptsx_tf(ptsx.data(), ptsx.size());
           Eigen::Map<Eigen::RowVectorXd> ptsy_tf(ptsy.data(), ptsy.size());
-          Eigen::MatrixXd pts_tf;
-          pts_tf << ptsx_tf,
-                    ptsy_tf;
+          Eigen::MatrixXd pts_tf = Eigen::MatrixXd::Ones(3,ptsx_tf.size());
+          cout << "size of pts_tf: " << pts_tf.rows() << "x" << pts_tf.cols() << endl;
+          cout << "got before pts_tf" << endl;
+          pts_tf.topRows(2) << ptsx_tf,ptsy_tf;
+          cout << "size of pts_tf: " << pts_tf.rows() << "x" << pts_tf.cols() << endl;
+          cout << "pts_tf is: " << pts_tf << endl;
 
           // transforming the vectors from the world frame to the vehicle frame
-          pts_tf = transformation_matrix*pts_tf + translation_vector;
+          cout << "got before transformation" << endl;
+          cout << "transformation_matrix is: " << transformation_matrix << endl;
+          pts_tf = transformation_matrix*pts_tf;
 
           // fit a polynomial to the way-points in the vehicle frame
+          cout << "got before polyfit" << endl;
           Eigen::VectorXd path_coefficients = polyfit(pts_tf.row(0), pts_tf.row(1), POLYNOM_ORDER);
 
           /*
@@ -144,9 +146,9 @@ int main() {
           // the cte is f(x_t) - y_t. here x_t = y_t = 0 because the path is in the vehicle frame
           double cte = polyeval(path_coefficients,0);
 
-          // the e_psi is psi_des - psi_t, where psi_des is the tangential angle of the polynomial evaluated at x_t
-          // but x_t = 0 and psi_t = 0 (in frame of vehicle) so e_psi = psi_des = the coefficient of order 1
-          double e_psi = path_coefficients[1];
+          // the e_psi is psi_t - psi_des, where psi_des is the tangential angle of the polynomial evaluated at x_t
+          // but x_t = 0 and psi_t = 0 (in frame of vehicle) so e_psi = -psi_des = -atan(the coefficient of order 1)
+          double e_psi = -atan(path_coefficients[1]);
 
           // set the state vector
           Eigen::VectorXd current_state(6);
@@ -155,10 +157,11 @@ int main() {
           /*
           * Calculate steering angle and throttle using MPC.
           */
-          double steer_value;
-          double throttle_value;
-
-
+          cout << "got before mcp.Solve" << endl;
+          vector<double> actuator_vals = mpc.Solve(current_state,path_coefficients);
+          cout << "finished with mcp.Solve" << endl;
+          double steer_value = actuator_vals[0]/deg2rad(25);
+          double throttle_value = actuator_vals[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -177,8 +180,8 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+          vector<double> next_x_vals;//(pts_tf.row(0).data(), pts_tf.row(0).data() + pts_tf.cols());
+          vector<double> next_y_vals;//(pts_tf.row(1).data(), pts_tf.row(1).data() + pts_tf.cols());
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
