@@ -12,7 +12,7 @@ using CppAD::AD;
 // TODO: Set the timestep length and duration
 #define PREDICTION_HORIZON 1 //seconds
 
-size_t N = 5;
+size_t N = 10;
 double dt = PREDICTION_HORIZON/(double)N; //seconds
 
 // retrieve the number of state variables
@@ -86,25 +86,25 @@ class FG_eval {
       AD<double> cte1 = vars[cte_start + t];
       AD<double> e_psi1 = vars[e_psi_start + t];
 
-      //calculate the current desired y location - f_x0 and the current desired psi - psi_des
+      //calculate the current desired y location - f_x0 and the current desired psi - psi_des0
       AD<double> f_x0 = 0;
-      AD<double> psi_des = 0;
+      AD<double> psi_des0 = 0;
       // calculate f(x0)
       for (int i = 0; i < coeffs.size(); i++)
         f_x0 += coeffs[i] * CppAD::pow(x0,i);
       // calculate f'(x0)
       for (int i = 1; i < coeffs.size(); i++)
-        psi_des += i * coeffs[i] * CppAD::pow(x0,i-1);
+        psi_des0 += i * coeffs[i] * CppAD::pow(x0,i-1);
       // calculate atan(f'(x0))
-      psi_des = CppAD::atan(psi_des);
+      psi_des0 = CppAD::atan(psi_des0);
 
       // update constraints
       fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
-      fg[1 + y_start + t] = y1 - (y1 + v0 * CppAD::sin(psi0) * dt);
+      fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
       fg[1 + psi_start + t] = psi1 - (psi0 + (v0/Lf) * delta0 * dt);
       fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
       fg[1 + cte_start + t] = cte1 - ((f_x0-y0) + v0 * CppAD::sin(e_psi0) * dt);
-      fg[1 + e_psi_start + t] = e_psi1 - ((e_psi0-psi_des) + (v0/Lf) * delta0 * dt);
+      fg[1 + e_psi_start + t] = e_psi1 - ((e_psi0-psi_des0) + (v0/Lf) * delta0 * dt);
     }
 
     // set the cost function
