@@ -7,12 +7,12 @@
 using CppAD::AD;
 
 // define desired velocity
-#define velocity_des 40
+#define velocity_des 70
 
 // TODO: Set the timestep length and duration
-#define PREDICTION_HORIZON 1 //seconds
+#define PREDICTION_HORIZON 0.7 //seconds
 
-size_t N = 10;
+size_t N = 7;
 double dt = PREDICTION_HORIZON/(double)N; //seconds
 
 // retrieve the number of state variables
@@ -73,7 +73,7 @@ class FG_eval {
       AD<double> y0 = vars[y_start + t - 1];
       AD<double> psi0 = vars[psi_start + t - 1];
       AD<double> v0 = vars[v_start + t - 1];
-      //AD<double> cte0 = vars[cte_start + t - 1];
+      AD<double> cte0 = vars[cte_start + t - 1];
       AD<double> e_psi0 = vars[e_psi_start + t - 1];
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
@@ -104,16 +104,16 @@ class FG_eval {
       fg[1 + psi_start + t] = psi1 - (psi0 + (v0/Lf) * delta0 * dt);
       fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
       fg[1 + cte_start + t] = cte1 - ((f_x0-y0) + v0 * CppAD::sin(e_psi0) * dt);
-      fg[1 + e_psi_start + t] = e_psi1 - ((e_psi0-psi_des0) + (v0/Lf) * delta0 * dt);
+      fg[1 + e_psi_start + t] = e_psi1 - ((psi0-psi_des0) + (v0/Lf) * delta0 * dt);
     }
 
     // set the cost function
     fg[0] = 0;
     // punish for position error, angular error, and velocity error
     for (size_t t = 0; t < N; t++) {
-      fg[0] += CppAD::pow(vars[cte_start+t],2);  //cte^2
-      fg[0] += CppAD::pow(vars[e_psi_start+t],2);  //e_psi^2
-      fg[0] += CppAD::pow(vars[v_start+t] - velocity_des,2);  //velocity_error^2
+      fg[0] += 1*CppAD::pow(vars[cte_start+t],2);  //cte^2
+      fg[0] += 100*CppAD::pow(vars[e_psi_start+t],2);  //e_psi^2
+      fg[0] += 0.3*CppAD::pow(vars[v_start+t] - velocity_des,2);  //velocity_error^2
     }
 
     // punish for use of actuators.
@@ -124,8 +124,8 @@ class FG_eval {
 
     // punish for strong change in actuators
     for (size_t t = 0; t < N-2; t++) {
-      fg[0] += CppAD::pow(vars[delta_start+t+1] - vars[delta_start+t],2); //steering diff
-      fg[0] += CppAD::pow(vars[a_start+t+1] - vars[a_start+t],2); //acceleration diff
+      fg[0] += 50*CppAD::pow(vars[delta_start+t+1] - vars[delta_start+t],2); //steering diff
+      fg[0] += 0.1*CppAD::pow(vars[a_start+t+1] - vars[a_start+t],2); //acceleration diff
     }
 
   }

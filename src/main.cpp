@@ -9,8 +9,8 @@
 #include "MPC.h"
 #include "json.hpp"
 
-// define the simulated latency
-#define LATENCY_TIME 100
+// define the simulated latency [msec]
+#define LATENCY_TIME 0
 
 // define path polynomial order
 #define POLYNOM_ORDER 3
@@ -83,7 +83,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    //cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -97,8 +97,8 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
-          //double current_steering = j[1]["steering_angle"];
-          //double current_throttle = j[1]["throttle"];
+          double current_steering = j[1]["steering_angle"];
+          double current_throttle = j[1]["throttle"];
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -143,18 +143,25 @@ int main() {
           // but x_t = 0 and psi_t = 0 (in frame of vehicle) so e_psi = -psi_des = -atan(the coefficient of order 1)
           double e_psi = -atan(path_coefficients[1]);
 
+          // compensate for latency
+          std::cout << "current_steering is: " << current_steering << std::endl;
+          double latency = LATENCY_TIME/1000.0;
+          double x0 = v*latency;
+          double psi0 = -(v/2.67)*current_steering*latency;
+          double v0 = v + current_throttle*latency;
+
           // set the state vector
           Eigen::VectorXd current_state(6);
-          current_state << 0, 0, 0, v, cte, e_psi;
+          current_state << x0, 0, psi0, v0, cte, e_psi;
+          cout << "cte: " << cte << endl;
+          cout << "e_psi: " << e_psi << endl;
 
           /*
           * Calculate steering angle and throttle using MPC.
           */
           vector<double> actuator_vals = mpc.Solve(current_state,path_coefficients);
-          double steer_value = actuator_vals[0]/deg2rad(25);
+          double steer_value = - actuator_vals[0]/deg2rad(25);
           double throttle_value = actuator_vals[1];
-          cout << "steering_angle is: " << steer_value << endl;
-          cout << "throttle_value is: " << throttle_value << endl;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
