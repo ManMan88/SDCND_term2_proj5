@@ -144,17 +144,15 @@ int main() {
           double e_psi = -atan(path_coefficients[1]);
 
           // compensate for latency
-          std::cout << "current_steering is: " << current_steering << std::endl;
+          double Lf = 2.67;
           double latency = LATENCY_TIME/1000.0;
           double x0 = v*latency;
-          double psi0 = -(v/2.67)*current_steering*latency;
+          double psi0 = -(v/Lf)*current_steering*latency;
           double v0 = v + current_throttle*latency;
 
           // set the state vector
           Eigen::VectorXd current_state(6);
           current_state << x0, 0, psi0, v0, cte, e_psi;
-          cout << "cte: " << cte << endl;
-          cout << "e_psi: " << e_psi << endl;
 
           /*
           * Calculate steering angle and throttle using MPC.
