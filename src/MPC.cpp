@@ -6,14 +6,12 @@
 
 using CppAD::AD;
 
-// define desired velocity
-#define velocity_des 70
+// define desired velocity (in m/s)
+#define velocity_des 60*0.44704
 
 // TODO: Set the timestep length and duration
-#define PREDICTION_HORIZON 0.7 //seconds
-
-size_t N = 7;
-double dt = PREDICTION_HORIZON/(double)N; //seconds
+size_t N = 15;
+double dt = 0.1; //seconds
 
 // retrieve the number of state variables
 #define n_state 6
@@ -112,20 +110,20 @@ class FG_eval {
     // punish for position error, angular error, and velocity error
     for (size_t t = 0; t < N; t++) {
       fg[0] += 1*CppAD::pow(vars[cte_start+t],2);  //cte^2
-      fg[0] += 100*CppAD::pow(vars[e_psi_start+t],2);  //e_psi^2
-      fg[0] += 0.3*CppAD::pow(vars[v_start+t] - velocity_des,2);  //velocity_error^2
+      fg[0] += 1*CppAD::pow(vars[e_psi_start+t],2);  //e_psi^2
+      fg[0] += CppAD::pow(vars[v_start+t] - velocity_des,2);  //velocity_error^2
     }
 
     // punish for use of actuators.
     for (size_t t = 0; t < N-1; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t], 2); //steering
+      fg[0] += 1000*CppAD::pow(vars[delta_start + t], 2); //steering
       fg[0] += CppAD::pow(vars[a_start + t], 2); //acceleration
     }
 
     // punish for strong change in actuators
     for (size_t t = 0; t < N-2; t++) {
-      fg[0] += 50*CppAD::pow(vars[delta_start+t+1] - vars[delta_start+t],2); //steering diff
-      fg[0] += 0.1*CppAD::pow(vars[a_start+t+1] - vars[a_start+t],2); //acceleration diff
+      fg[0] += 10*CppAD::pow(vars[delta_start+t+1] - vars[delta_start+t],2); //steering diff
+      fg[0] += CppAD::pow(vars[a_start+t+1] - vars[a_start+t],2); //acceleration diff
     }
 
   }
