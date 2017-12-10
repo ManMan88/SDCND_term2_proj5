@@ -2,7 +2,7 @@
 [![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 ---
 
-![Video](http://img.youtube.com/vi/2tlKq_XdjJ4/0.jpg)](http://www.youtube.com/watch?v=2tlKq_XdjJ4)
+![Video](http://img.youtube.com/vi/2tlKq_XdjJ4/0.jpg)]
 
 
 ## Overview
@@ -56,7 +56,9 @@ After that, we use the state update equations to predict next state in 100 ms in
 
 ## Prediction Horizon
 
-Another important step is to choose the prediction horizon - the duration over which future predictions are made. `N` is the number of timesteps in the horizon, `dt` is how much time elapses between actuations. By trial and error I found that `N = 7` and `dt = 0.1` seconds worked best for my model.
+Another important step is to choose the prediction horizon - the duration over which future predictions are made. `N` is the number of timesteps in the horizon, `dt` is how much time elapses between actuations. By trial and error I found that `N = 15` and `dt = 0.1` seconds worked best for my model.
+As `dt` gets smaller, the calculation of the kinematic model should be more accurate since the real model is continuous and not descrete. However, I found out that for very small `dt` the MPC does not behave well. I assume this is due to numeric errors. I could use a smaller `dt`, however I found it was not necessary as the MPC performed well enough. Decreasing `dt` further would result in more calculation (or shorter prediction horizon) which slows the process.
+`N = 15' yeilds a prediction horizon of 1.5 seconds. For a velocity of 60 miles/hour (~26.8 m/s) it means a prediction for about 40 meters. Using any value larger than this is a waste of computing power as the prediction for larger times would be very unaccurate. I could use even smaller values, but I found through trial and error that this value yeild smoother results.
 
 ## Dependencies
 
