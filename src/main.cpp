@@ -10,7 +10,7 @@
 #include "json.hpp"
 
 // define the simulated latency [msec]
-#define LATENCY_TIME 0
+#define LATENCY_TIME 100
 
 // define path polynomial order
 #define POLYNOM_ORDER 3
@@ -143,16 +143,28 @@ int main() {
           // but x_t = 0 and psi_t = 0 (in frame of vehicle) so e_psi = -psi_des = -atan(the coefficient of order 1)
           double e_psi = -atan(path_coefficients[1]);
 
-          // compensate for latency
+          /*
+           * compensate for latency
+           */
           double Lf = 2.67;
           double latency = LATENCY_TIME/1000.0;
-          double x0 = v*latency;
-          double psi0 = -(v/Lf)*current_steering*latency;
+          // transform steering from simulator to model
+          double delta = -current_steering;
+          psi = delta;
+          // convert velocity from mile/hour to m/s
+          v *= 0.44704;
+          // compensate for latency
+          double x0 = v*cos(psi)*latency;
+          double y0 = v*sin(psi)*latency;
+          double psi0 = psi + (v/Lf)*delta*latency;
+          double cte0 = cte + v*sin(e_psi)*latency;
+          double e_psi0 = e_psi + v*delta*latency/Lf;
           double v0 = v + current_throttle*latency;
+
 
           // set the state vector
           Eigen::VectorXd current_state(6);
-          current_state << x0, 0, psi0, v0, cte, e_psi;
+          current_state << x0, y0, psi0, v0, cte0, e_psi0;
 
           /*
           * Calculate steering angle and throttle using MPC.
